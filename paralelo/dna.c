@@ -123,10 +123,19 @@ void preprocessamento(){
 char *bases;
 char *str;
 
-int main(char** argv) {
+int main(int argc, char** argv) {
+	
+	double t_inicial = omp_get_wtime();
+	double tp_inicial, tp = 0.0;
 	clock_t t = clock();
-	cabs =0;
-	int nt = 4;// (int) *argv[1]; // ver outra forma de usar isso 
+	cabs=0;
+	int nt;
+	if ( argv[1] == NULL )
+		nt = 1;
+	else
+		nt = atoi(argv[1]);
+	
+	
 	bases = (char*) malloc(sizeof(char) * 1000001);
 	if (bases == NULL) {
 		perror("malloc");
@@ -170,6 +179,7 @@ int main(char** argv) {
 		fgets(line, 100, fdatabase);
 		remove_eol(line);
 
+		tp_inicial = omp_get_wtime();
 		#pragma omp parallel num_threads(nt) private(result)
 		{
 			int id, nthrds;
@@ -178,7 +188,6 @@ int main(char** argv) {
 			
 			for(int y=id; y <= cabs; y=y+nthrds)
 			{	
-				// printf("Ola, sou a thread: %d | y value: %d \n", id, y);
 				result = bmhs( marcadores[y].genoma, strlen( marcadores[y].genoma ), str, strlen(str)); 
 				#pragma omp critical 
 				{			
@@ -190,11 +199,10 @@ int main(char** argv) {
 
 			}
 		}
-		// h++;
+		tp+=omp_get_wtime()-tp_inicial;
+		
 		if (!found)
 			fprintf(fout, "NOT FOUND\n");
-		// if (h > 60)
-		// 	break;
 		
 	}
 
@@ -203,8 +211,10 @@ int main(char** argv) {
 	free(str);
 	free(bases);
 	t = clock() - t; //dado em seg
+	double t_final = omp_get_wtime() - t_inicial;
 	double t_total = ((double)t)/CLOCKS_PER_SEC;
-	printf("Resultado openfile: %f \n", t_total);
+	printf("Resultado com clock: %f \n", t_total);
+	printf("Tempo da main thread: %lf \nTempo paralelo: %lf \n", t_total, (t_total-tp));
 	return EXIT_SUCCESS;
 }
 
