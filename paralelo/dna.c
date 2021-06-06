@@ -12,9 +12,11 @@ int bmhs(char *string, int n, char *substr, int m) {
 
 	int d[MAX];
 	int i, j, k;
+	char tmp[100000];
+	
 	// pre-processing 
-	#pragma omp simd //tacerto
-	for (j = 0; j < MAX; j++) // talvez de pra usar o pragm do smid aqui (so no primeiro, o segundo da pq os elementos nao estao anihados)
+	#pragma omp simd 
+	for (j = 0; j < MAX; j++) 
 		d[j] = m + 1;
 	
 	#pragma omp simd
@@ -35,13 +37,11 @@ int bmhs(char *string, int n, char *substr, int m) {
 		}
 		i = i + d[(int) string[i + 1]];
 	}
-	// printf("");
 	return -1;
 }
 
 FILE *fdatabase, *fquery, *fout;
 
-//[tempo e curto pra krl, nao tem necessidade de usar isso] fazer aquele esquema do pragma de single thread e transformar cada if em uma task... talvez pro close files tb seja uma boa ideia (teria que medir o tempo)
 void openfiles() {
 
 	fdatabase = fopen("dna.in", "r+");
@@ -89,27 +89,19 @@ typedef struct{
 	char genoma[1000001];
 } marcador;
 
-marcador marcadores[1000]; // 1000 marcadores inicialmente, acho que nao passa disso
+marcador marcadores[1000];
 int cabs;
 
 
 void preprocessamento(){
-//pegar a primeira linha ( cabecalho inicial) fora do while, e marcar a pulada de linha dele com um &
-//depois trabalhar em cima desse simbolo
-// os marcadores [i][i+1] sao representantes das posicoes de real inicio/parada para cada thread
-// na hora de quebrar os lacos, cada thread via ter que ser seu numero
-// pq nao esta copiando depois do primeiro /n?
-// se for assim com um campo so para texto, entao vai mudar os marcadores. ai vai mudar os controladores de id
-// ta errando so a onde pegar o paraneu
 	char linha[100];
-	int j; //i;
+	int j;
 	fseek(fdatabase, 0, SEEK_SET);
 	fgets(linha, 100, fdatabase);
 	remove_eol(linha);
 
 	strcpy( marcadores[0].text_cab, linha );
-	j = 0; //i = 0;
-
+	j = 0;
 	while(!feof(fdatabase))
 	{
 		fgets(linha, 100, fdatabase);
@@ -134,7 +126,7 @@ char *str;
 int main(char** argv) {
 	clock_t t = clock();
 	cabs =0;
-	int nt = 0;// (int) *argv[1]; // ver outra forma de usar isso 
+	int nt = 4;// (int) *argv[1]; // ver outra forma de usar isso 
 	bases = (char*) malloc(sizeof(char) * 1000001);
 	if (bases == NULL) {
 		perror("malloc");
@@ -148,63 +140,62 @@ int main(char** argv) {
 
 	openfiles();
 
-	// printf("bacs antes do openfile: %d \n",cabs);
 	preprocessamento();
-	// printf("bacs dep do openfile: %d \n",cabs);
-	// for (int m = 0; ( marcadores[m].cab != -1 || marcadores[m].com != -1 ); m++ )
-	// 	printf("posicao e valor: [ patogenico: %s \n ] [ m: %d ] ~ [cab: %d] ~ [com %d] ~ [elemento da pos: %c  %c] \n", marcadores[m].text_cab, m, marcadores[m].cab, marcadores[m].com, dna_completo[ (int)marcadores[m].cab ], dna_completo[ (int) marcadores[m].com] );
-	// for (int y = 0; y < cabs; y++)
-	// {	
-	// 	printf("seq: %s \n tenho tamanho: %ld \n %.30s \n", marcadores[y].text_cab, strlen( marcadores[y].genoma ) ,marcadores[y].genoma);
-	// }
-	// return 0;
+
 	char desc_dna[100], desc_query[100];
 	char line[100];
-	int i, found, result;
-	int y,h=0;
+	int i,h, found, result;
 	fgets(desc_query, 100, fquery); 
 	remove_eol(desc_query);
+	// h = 0;
 	while (!feof(fquery)) {
 		fprintf(fout, "%s\n", desc_query);
 		// read query string
-		fgets(line, 100, fquery); // vai precisar de barreira 
+		fgets(line, 100, fquery);  
 		remove_eol(line);
 		str[0] = 0;
 		i = 0;
-		do {  // talvez mudar esse bloco para algo que seja possivel fazer de forma paralela, 2 linhas por vez ou algo do tipo
-			strcat(str + i, line); // vai precisar de barreira
+		do { 
+			strcat(str + i, line); 
 			if (fgets(line, 100, fquery) == NULL)
 				break;
 			remove_eol(line);
 			i += 80;
 		} while (line[0] != '>');
-		strcpy(desc_query, line); // vai precisar de barreira
+		strcpy(desc_query, line); 
 
 		// read database and search
 		found = 0;
 		fseek(fdatabase, 0, SEEK_SET);
 		fgets(line, 100, fdatabase);
 		remove_eol(line);
-		
-		// printf("antes do for: %d \n", h);
-		for (y = 0; y <=cabs; y++ )
-		{	
-			// printf("entrei no for meu valor> %d ||| hzao: %d \n", y, h );
 
-			// printf("pos result \n");
-			result = bmhs( marcadores[y].genoma, strlen( marcadores[y].genoma ), str, strlen(str)); //str eh a query
-			// printf(" ** entrei pos for meu valor> %d ||| hzao: %d \n", y, h );
-			if (result > 0) {
-				// printf("antes de escrever o result");
-				fprintf(fout, "%s\n%d\n", marcadores[y].text_cab, result);
-				found++;
-				// printf("depois de escrever o result");
+		#pragma omp parallel num_threads(nt) private(result)
+		{
+			int id, nthrds;
+			id = omp_get_thread_num();
+			nthrds = omp_get_num_threads();
+			
+			for(int y=id; y <= cabs; y=y+nthrds)
+			{	
+				// printf("Ola, sou a thread: %d | y value: %d \n", id, y);
+				result = bmhs( marcadores[y].genoma, strlen( marcadores[y].genoma ), str, strlen(str)); 
+				#pragma omp critical 
+				{			
+						if (result > 0) {
+							fprintf(fout, "%s\n%d\n", marcadores[y].text_cab, result);
+							found++;
+						}
+				}
+
 			}
-			// printf("pos if\n");
 		}
+		// h++;
 		if (!found)
 			fprintf(fout, "NOT FOUND\n");
-		h++;
+		// if (h > 60)
+		// 	break;
+		
 	}
 
 	closefiles();

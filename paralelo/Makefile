@@ -1,5 +1,5 @@
 FLAGS=-O2 \
-	-finline-functions -funswitch-loops -fpredictive-commoning -fgcse-after-reload -ftree-vectorize -fipa-cp-clone
+	 -fopenmp -finline-functions -funswitch-loops -fpredictive-commoning -fgcse-after-reload -ftree-vectorize -fipa-cp-clone
 
 CC=gcc
 
