@@ -12,7 +12,6 @@ int bmhs(char *string, int n, char *substr, int m) {
 
 	int d[MAX];
 	int i, j, k;
-	char tmp[100000];
 	
 	// pre-processing 
 	#pragma omp simd 
@@ -87,6 +86,7 @@ static inline void remove_eol(char *line) {
 typedef struct{
 	char text_cab[100];
 	char genoma[1000001];
+	int tam;
 } marcador;
 
 marcador marcadores[1000];
@@ -113,6 +113,7 @@ void preprocessamento(){
 					break;
 				remove_eol(linha);
 		} while (linha[0] != '>');
+		marcadores[j].tam = strlen(marcadores[j].genoma); 
 		cabs++;
 		j++;
 		strcpy( marcadores[j].text_cab, linha );
@@ -120,7 +121,6 @@ void preprocessamento(){
 	cabs-=1;
 }
 
-char *bases;
 char *str;
 
 int main(int argc, char** argv) {
@@ -135,12 +135,6 @@ int main(int argc, char** argv) {
 	else
 		nt = atoi(argv[1]);
 	
-	
-	bases = (char*) malloc(sizeof(char) * 1000001);
-	if (bases == NULL) {
-		perror("malloc");
-		exit(EXIT_FAILURE);
-	}
 	str = (char*) malloc(sizeof(char) * 1000001);
 	if (str == NULL) {
 		perror("malloc str");
@@ -156,7 +150,7 @@ int main(int argc, char** argv) {
 	int i,h, found, result;
 	fgets(desc_query, 100, fquery); 
 	remove_eol(desc_query);
-	// h = 0;
+	
 	while (!feof(fquery)) {
 		fprintf(fout, "%s\n", desc_query);
 		// read query string
@@ -165,11 +159,10 @@ int main(int argc, char** argv) {
 		str[0] = 0;
 		i = 0;
 		do { 
-			strcat(str + i, line); 
+			strcat(str, line); 
 			if (fgets(line, 100, fquery) == NULL)
 				break;
 			remove_eol(line);
-			i += 80;
 		} while (line[0] != '>');
 		strcpy(desc_query, line); 
 
@@ -188,7 +181,7 @@ int main(int argc, char** argv) {
 			
 			for(int y=id; y <= cabs; y=y+nthrds)
 			{	
-				result = bmhs( marcadores[y].genoma, strlen( marcadores[y].genoma ), str, strlen(str)); 
+				result = bmhs( marcadores[y].genoma, marcadores[y].tam, str, strlen(str)); 
 				#pragma omp critical 
 				{			
 						if (result > 0) {
@@ -203,25 +196,16 @@ int main(int argc, char** argv) {
 		
 		if (!found)
 			fprintf(fout, "NOT FOUND\n");
-		
 	}
 
 	closefiles();
 
 	free(str);
-	free(bases);
 	t = clock() - t; //dado em seg
 	double t_final = omp_get_wtime() - t_inicial;
 	double t_total = ((double)t)/CLOCKS_PER_SEC;
 	printf("Resultado com clock: %f \n", t_total);
-	printf("Tempo da main thread: %lf \nTempo paralelo: %lf \n", t_total, (t_total-tp));
+	// printf("Tempo da main thread: %lf \nTempo paralelo: %lf \n", t_total, ((t_total - tp)));
+	printf("Tempo da main thread: %lf \n Tempo threads: %lf \n", t_total, ((tp)));
 	return EXIT_SUCCESS;
 }
-
-
-
-
-
-	// t = clock() - t; //dado em seg
-	// double t_total = ((double)t1)/CLOCKS_PER_SEC;
-	// printf("Resultado openfile: %f \n", t_total);
